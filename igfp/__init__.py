@@ -1,10 +1,11 @@
+from enum import Enum
 from functools import lru_cache
 from time import time
-from typing import Any, List, Optional, Set
+from typing import Any, List, Optional, cast
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.logger import logger
-from httpx import AsyncClient
+from httpx import AsyncClient, HTTPStatusError, Response
 from pydantic import BaseModel, BaseSettings
 
 igfp = FastAPI(openapi_url=None)
@@ -20,11 +21,16 @@ iggraph = AsyncClient(
 )
 
 
+class ProtocolEnum(str, Enum):
+    HTTP = "http"
+    HTTPS = "https"
+
+
 class SettingsModel(BaseSettings):
 
     application_id: str
     application_secret: str
-    hostname: str
+    domain: str
     media_fields: str = (
         "caption, "
         "id, "
@@ -46,6 +52,7 @@ class SettingsModel(BaseSettings):
     )
     media_refresh_delay: int = 60 * 5
     """ Refresh media every 5 minutes to avoid API rate limiting. """
+    protocol: ProtocolEnum = ProtocolEnum.HTTPS
     scopes: List[str] = ["user_media", "user_profile"]
     token_refresh_delay: int = 60 * 60 * 24 * 30
     """ Refresh every 30 days, to be sure we do not miss the window without spamming. """
@@ -62,6 +69,13 @@ class ContextModel(BaseModel):
     token_refreshed: float = 0
 
 
+def raise_for_status(response: Response) -> None:
+    try:
+        response.raise_for_status()
+    except HTTPStatusError as e:
+        raise HTTPException(detail=str(e), status_code=response.status_code)
+
+
 @lru_cache(maxsize=1)
 def Context() -> ContextModel:
     return ContextModel()
@@ -74,8 +88,7 @@ def Settings() -> SettingsModel:
 
 @lru_cache(maxsize=1)
 def RedirectURI(settings: SettingsModel = Depends(Settings)) -> str:
-    # TODO: build URI from settings.hostname
-    return ""
+    return f"{settings.protocol}://{settings.domain}/authorize"
 
 
 async def AccessToken(
@@ -87,7 +100,10 @@ async def AccessToken(
     Aims to be used as a dependency to ensure continuous token refresh.
     """
     if context.token is None:
-        raise HTTPException()
+        raise HTTPException(
+            detail="You must authorize application first",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
     now = time()
     if now - context.token_refreshed > settings.token_refresh_delay:
         response = await iggraph.get(
@@ -100,8 +116,7 @@ async def AccessToken(
         response.raise_for_status()
         context.token = response.json().get("access_token")
         context.token_refreshed = now
-    # TODO: fix this edge case :/
-    return context.token
+    return cast(str, context.token)
 
 
 @igfp.on_event("startup")
@@ -128,7 +143,7 @@ async def authorize(
     settings: SettingsModel = Depends(Settings),
 ) -> None:
     if context.token is not None:
-        raise HTTPException()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     # NOTE: Retrieve initial token.
     response = await igapi.post(
         "/oauth/access_token",
@@ -140,7 +155,7 @@ async def authorize(
             "redirect_uri": redirect_uri,
         },
     )
-    response.raise_for_status()
+    raise_for_status(response)
     initial_token = response.json()
     # NOTE: exchange for 60 days long token.
     response = await iggraph.get(
@@ -151,7 +166,7 @@ async def authorize(
             "access_token": initial_token,
         },
     )
-    response.raise_for_status()
+    raise_for_status(response)
     context.token = response.json().get("access_token")
     context.token_refreshed = time()
 
@@ -169,7 +184,7 @@ async def media(
             f"/me/media",
             params={"access_token": access_token, "fields": settings.media_fields},
         )
-        # TODO: handle / log error.
+        raise_for_status(response)
         context.media = response.json()
         context.media_refreshed = now
     return context.media

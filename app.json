@@ -1,0 +1,41 @@
+{
+    "name": "igfeed-proxy",
+    "description": "A cached proxy application based on Instagram Basic Display API",
+    "repository": "https://github.com/Faylixe/igfeed-proxy",
+    "keywords": [
+        "instagram",
+        "token",
+        "basic-display-api",
+        "instafeed"
+    ],
+    "env": {
+        "IGFP_APPLICATION_ID": {
+            "description": "Facebook application identifier",
+            "required": true,
+            "value": ""
+        },
+        "IGFP_APPLICATION_SECRET": {
+            "description": "Facebook application secret",
+            "required": true,
+            "value": ""
+        },
+        "IGFP_DOMAIN": {
+            "description": "Target domain on which this application will live",
+            "required": true,
+            "value": "domain.tld"
+        },
+        "IGFP_PROTOCOL": {
+            "description": "Either HTTP or HTTPS, (default HTTPS)",
+            "required": false,
+            "value": "https"
+        }
+    },
+    "buildpacks": [
+        {
+            "url": "https://github.com/moneymeets/python-poetry-buildpack.git"
+        },
+        {
+            "url": "heroku/python"
+        }
+    ]
+}
