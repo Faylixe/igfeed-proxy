@@ -1,1 +1,1 @@
-web: hypercorn --workers 1 --worker-class uvloop --access-logfile - --bind 0.0.0.0:${PORT:-5000} igfp:igfp
+web: hypercorn --workers 1 --worker-class uvloop --access-logfile - --bind 0.0.0.0:${PORT:-5000} igfp:api

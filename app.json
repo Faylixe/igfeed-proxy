@@ -10,24 +10,49 @@
     ],
     "env": {
         "IGFP_APPLICATION_ID": {
-            "description": "Facebook application identifier",
+            "description": "Instagram application id",
             "required": true,
             "value": ""
         },
         "IGFP_APPLICATION_SECRET": {
-            "description": "Facebook application secret",
+            "description": "Instagram application secret",
             "required": true,
             "value": ""
         },
         "IGFP_DOMAIN": {
             "description": "Target domain on which this application will live",
             "required": true,
-            "value": "domain.tld"
+            "value": "yourapp.herokuapp.com"
+        },
+        "IGFP_CORS_ORIGINS": {
+            "description": "Allowed URL for CORS API requests",
+            "required": true,
+            "value": "https://domain1.tld"
         },
         "IGFP_PROTOCOL": {
-            "description": "Either HTTP or HTTPS, (default HTTPS)",
-            "required": false,
+            "description": "Either HTTP or HTTPS, (leave default HTTPS)",
+            "required": true,
             "value": "https"
+        },
+        "IGFP_MEDIA_FIELDS": {
+            "description": "GraphQL specification of field to retrieve for media fetching",
+            "required": true,
+            "value": "caption,id,media_type,media_url,permalink,thumbnail_url,timestamp,username,children{id,media_type,media_url,permalink,thumbnail_url,timestamp,username}"
+        },
+        "IGFP_MEDIA_REFRESH_DELAY": {
+            "description": "Delay between Instagram media cache invalidation",
+            "required": true,
+            "value": "300"
+        },
+        "IGFP_SCOPES": {
+            "description": "List of OAuth scope to authorize for Instagram API usage",
+            "required": true,
+            "value": "user_media,user_profile"
+        },
+        "IGFP_TOKEN_REFRESH_DELAY": {
+            "description": "Delay for long lived API token invalidation",
+            "required": true,
+            "value": "user_media,user_profile"
         }
     },
     "buildpacks": [
