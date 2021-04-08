@@ -1,9 +1,10 @@
 import logging
 from enum import Enum
-from functools import lru_cache
+from functools import lru_cache, partial
 from time import time
-from typing import Any, List, Optional, Union, cast
+from typing import Any, Callable, List, Optional, Union, cast
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from httpx import AsyncClient, HTTPStatusError, Response
@@ -11,6 +12,7 @@ from pydantic import AnyHttpUrl, BaseModel, BaseSettings, validator
 from starlette.responses import RedirectResponse
 
 api = FastAPI(docs_url=None, openapi_url=None, redoc_url=None)
+
 igapi = AsyncClient(
     base_url="https://api.instagram.com",
     headers={"Accept": "application/json"},
@@ -44,6 +46,7 @@ class SettingsModel(BaseSettings):
 
     APPLICATION_ID: str
     APPLICATION_SECRET: str
+    AUTO_PING_DELAY: int = -1
     DOMAIN: str
     CORS_ORIGINS: Union[str, List[AnyHttpUrl]] = []
     MEDIA_FIELDS: str = (
@@ -155,6 +158,16 @@ def startup(
     # settings: SettingsModel = Depends(Settings),
 ) -> None:
     settings = Settings()
+    if settings.AUTO_PING_DELAY > 0:
+        scheduler = AsyncIOScheduler()
+        scheduler.add_job(
+            AsyncClient().get,
+            "interval",
+            args=(f"{settings.PROTOCOL}://{settings.DOMAIN}",),
+            id="autoping",
+            minutes=settings.AUTO_PING_DELAY,
+        )
+        scheduler.start()
     api.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
@@ -173,10 +186,9 @@ def startup(
     )
 
 
-@api.get("/")
 @api.post("/unauthorize")
 @api.post("/remove")
-async def home() -> RedirectResponse:
+async def sink() -> RedirectResponse:
     return RedirectResponse(api.url_path_for("media"))
 
 
@@ -218,7 +230,7 @@ async def authorize(
     return RedirectResponse(api.url_path_for("media"))
 
 
-@api.get("/media")
+@api.get("/")
 async def media(
     access_token: str = Depends(AccessToken),
     context: ContextModel = Depends(Context),

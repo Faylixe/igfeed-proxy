@@ -53,7 +53,12 @@
             "description": "Delay for long lived API token invalidation",
             "required": true,
             "value": "user_media,user_profile"
-        }
+        },
+        "IGFP_AUTO_PING_DELAY": {
+            "description": "Delay in minutes between two auto ping (to avoid dyno idling",
+            "required": true,
+            "value": "5"
+        },
     },
     "buildpacks": [
         {
