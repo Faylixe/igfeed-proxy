@@ -20,7 +20,7 @@ iggraph = AsyncClient(
     headers={"Accept": "application/json"},
     http2=True,
 )
-logger = logging.getLogger("hypercorn.error")
+logger = logging.getLogger("hypercorn.access")
 
 
 class ProtocolEnum(str, Enum):
