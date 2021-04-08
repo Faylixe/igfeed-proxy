@@ -142,6 +142,7 @@ async def AccessToken(
         )
     now = time()
     if now - context.token_refreshed > settings.TOKEN_REFRESH_DELAY:
+        logger.info("Refresh long lived access token")
         response = await iggraph.get(
             f"refresh_access_token",
             params={
@@ -206,6 +207,7 @@ async def authorize(
     if context.token is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     # NOTE: Retrieve initial short lived token.
+    logger.info("Fetch short lived access token")
     response = await igapi.post(
         "/oauth/access_token",
         data={
@@ -217,8 +219,8 @@ async def authorize(
         },
     )
     raise_for_status(response)
-    # TODO: add a log message ?
     # NOTE: exchange for 60 days long token.
+    logger.info("Exchange for long lived access token")
     response = await iggraph.get(
         "/access_token",
         params={
@@ -228,7 +230,6 @@ async def authorize(
         },
     )
     raise_for_status(response)
-    # TODO: add a log message ?
     context.token = response.json().get("access_token")
     context.token_refreshed = time()
     return RedirectResponse(api.url_path_for("media"))
@@ -242,6 +243,7 @@ async def media(
 ) -> Any:
     now = time()
     if now - context.media_refreshed > settings.MEDIA_REFRESH_DELAY:
+        logger.info("Refreshing media content")
         response = await iggraph.get(
             f"/me/media",
             params={"access_token": access_token, "fields": settings.MEDIA_FIELDS},
