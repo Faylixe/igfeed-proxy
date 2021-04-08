@@ -121,9 +121,12 @@ async def AccessToken(
 
 @igfp.on_event("startup")
 def startup(
-    redirect_uri: str = Depends(RedirectURI),
-    settings: SettingsModel = Depends(Settings),
+    # NOTE: FastAPI doesn't support event callback dependency injection yet :'(
+    # redirect_uri: str = Depends(RedirectURI),
+    # settings: SettingsModel = Depends(Settings),
 ) -> None:
+    settings = Settings()
+    redirect_uri = RedirectURI(settings=settings)
     scopes = ",".join(settings.scopes)
     logger.info(
         f"To activate Instagram feed proxy please authenticate to "
