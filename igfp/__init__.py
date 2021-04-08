@@ -1,10 +1,11 @@
+import logging
+
 from enum import Enum
 from functools import lru_cache
 from time import time
 from typing import Any, List, Optional, cast
 
 from fastapi import Depends, FastAPI, HTTPException, status
-from fastapi.logger import logger
 from httpx import AsyncClient, HTTPStatusError, Response
 from pydantic import BaseModel, BaseSettings, Field
 
@@ -19,6 +20,7 @@ iggraph = AsyncClient(
     headers={"Accept": "application/json"},
     http2=True,
 )
+logger = logging.getLogger("hypercorn.error")
 
 
 class ProtocolEnum(str, Enum):
@@ -59,7 +61,7 @@ class SettingsModel(BaseSettings):
     """ Refresh every 30 days, to be sure we do not miss the window without spamming. """
 
     class Config:
-        env_prefix = "IGFP"
+        env_prefix = "IGFP_"
 
 
 class ContextModel(BaseModel):
@@ -126,9 +128,6 @@ def startup(
     # redirect_uri: str = Depends(RedirectURI),
     # settings: SettingsModel = Depends(Settings),
 ) -> None:
-    from os import environ
-
-    logger.info(f"ENVVARS: {environ}")
     settings = Settings()
     redirect_uri = RedirectURI(settings=settings)
     scopes = ",".join(settings.scopes)
