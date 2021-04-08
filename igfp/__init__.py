@@ -1,8 +1,8 @@
 import logging
 from enum import Enum
-from functools import lru_cache, partial
+from functools import lru_cache
 from time import time
-from typing import Any, Callable, List, Optional, Union, cast
+from typing import Any, List, Optional, Union, cast
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import Depends, FastAPI, HTTPException, status
