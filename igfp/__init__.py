@@ -165,26 +165,25 @@ async def authorize(
 ) -> None:
     if context.token is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-    # NOTE: Retrieve initial token.
+    # NOTE: Retrieve initial short lived token.
     response = await igapi.post(
         "/oauth/access_token",
-        json={
-            "app_id": settings.APPLICATION_ID,
-            "app_secret": settings.APPLICATION_SECRET,
+        data={
+            "client_id": settings.APPLICATION_ID,
+            "client_secret": settings.APPLICATION_SECRET,
             "code": code,
             "grant_type": "authorization_code",
             "redirect_uri": redirect_uri,
         },
     )
     raise_for_status(response)
-    initial_token = response.json()
     # NOTE: exchange for 60 days long token.
     response = await iggraph.get(
         "/access_token",
         params={
             "client_secret": settings.APPLICATION_SECRET,
             "grant_type": "ig_exchange_token",
-            "access_token": initial_token,
+            "access_token": response.json().get("access_token"),
         },
     )
     raise_for_status(response)
