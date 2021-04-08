@@ -81,14 +81,14 @@ class SettingsModel(BaseSettings):
 
     @validator("CORS_ORIGINS", pre=True)
     def _assemble_cors_origins(
-        _, origins: Union[str, List[AnyHttpUrl]]
+        cls, origins: Union[str, List[AnyHttpUrl]]
     ) -> List[AnyHttpUrl]:
         if isinstance(origins, str):
             return [AnyHttpUrl(origin.strip()) for origin in origins.split(",")]
         return origins
 
     @validator("SCOPES", pre=True)
-    def _assemble_scopes(_, scopes: Union[str, List[str]]) -> List[str]:
+    def _assemble_scopes(cls, scopes: Union[str, List[str]]) -> List[str]:
         if isinstance(scopes, str):
             return [scope.strip() for scope in scopes.split(",")]
         return scopes
