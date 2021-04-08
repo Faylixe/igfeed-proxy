@@ -156,7 +156,7 @@ async def placeholder() -> None:
     pass
 
 
-@igfp.post("/authorize")
+@igfp.get("/authorize")
 async def authorize(
     code: str,
     context: ContextModel = Depends(Context),
@@ -190,14 +190,15 @@ async def authorize(
     raise_for_status(response)
     context.token = response.json().get("access_token")
     context.token_refreshed = time()
+    # TODO: redirect to home.
 
 
-@igfp.get("/media.js")
+@igfp.get("/media")
 async def media(
     access_token: str = Depends(AccessToken),
     context: ContextModel = Depends(Context),
     settings: SettingsModel = Depends(Settings),
-) -> None:
+) -> Any:
     """ """
     now = time()
     if now - context.media_refreshed > settings.MEDIA_REFRESH_DELAY:
