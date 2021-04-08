@@ -8,7 +8,7 @@ from fastapi.logger import logger
 from httpx import AsyncClient, HTTPStatusError, Response
 from pydantic import BaseModel, BaseSettings
 
-igfp = FastAPI(openapi_url=None)
+igfp = FastAPI(docs_url=None, openapi_url=None, redoc_url=None)
 igapi = AsyncClient(
     base_url="https://api.instagram.com",
     headers={"Accept": "application/json"},
@@ -135,6 +135,13 @@ def startup(
     )
 
 
+@igfp.get("/")
+@igfp.post("/unauthorize")
+@igfp.post("/remove")
+async def placeholder() -> None:
+    pass
+
+
 @igfp.post("/authorize")
 async def authorize(
     code: str,
@@ -171,7 +178,7 @@ async def authorize(
     context.token_refreshed = time()
 
 
-@igfp.get("/")
+@igfp.get("/media.js")
 async def media(
     access_token: str = Depends(AccessToken),
     context: ContextModel = Depends(Context),
