@@ -88,7 +88,6 @@ def Settings() -> SettingsModel:
     return SettingsModel()
 
 
-@lru_cache(maxsize=1)
 def RedirectURI(settings: SettingsModel = Depends(Settings)) -> str:
     return f"{settings.PROTOCOL}://{settings.DOMAIN}/authorize"
 
@@ -128,15 +127,14 @@ def startup(
     # settings: SettingsModel = Depends(Settings),
 ) -> None:
     settings = Settings()
-    redirect_uri = RedirectURI(settings)
-    SCOPES = ",".join(settings.SCOPES)
+    scopes = ",".join(settings.SCOPES)
     logger.info(
         f"To activate Instagram feed proxy please authenticate to "
         f"{igapi.base_url}/oauth/authorize"
         f"?client_id={settings.APPLICATION_ID}"
-        f"&redirect_uri={redirect_uri}"
+        f"&redirect_uri={RedirectURI(settings)}"
         f"&response_type=code"
-        f"&scope={SCOPES}"
+        f"&scope={scopes}"
     )
 
 
