@@ -128,7 +128,7 @@ def startup(
     # settings: SettingsModel = Depends(Settings),
 ) -> None:
     settings = Settings()
-    redirect_uri = RedirectURI(settings=settings)
+    redirect_uri = RedirectURI(settings)
     SCOPES = ",".join(settings.SCOPES)
     logger.info(
         f"To activate Instagram feed proxy please authenticate to "
