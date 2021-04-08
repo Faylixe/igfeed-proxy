@@ -9,6 +9,7 @@ from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from httpx import AsyncClient, HTTPStatusError, Response
 from pydantic import AnyHttpUrl, BaseModel, BaseSettings, validator
+from pydantic.tools import parse_obj_as
 from starlette.responses import RedirectResponse
 
 api = FastAPI(docs_url=None, openapi_url=None, redoc_url=None)
@@ -84,7 +85,10 @@ class SettingsModel(BaseSettings):
         cls, origins: Union[str, List[AnyHttpUrl]]
     ) -> List[AnyHttpUrl]:
         if isinstance(origins, str):
-            return [AnyHttpUrl(origin.strip()) for origin in origins.split(",")]
+            return [
+                parse_obj_as(AnyHttpUrl, origin.strip())
+                for origin in origins.split(",")
+            ]
         return origins
 
     @validator("SCOPES", pre=True)
