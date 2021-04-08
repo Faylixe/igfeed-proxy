@@ -1,0 +1,43 @@
+name: test
+on:
+  pull_request:
+    branches:
+      - master
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.6, 3.7, 3.8, 3.9]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install Poetry
+        run: |
+          pip install poetry
+          poetry config virtualenvs.in-project false
+          poetry config virtualenvs.path ~/.virtualenvs
+      - name: Cache Poetry virtualenv
+        uses: actions/cache@v1
+        id: cache
+        with:
+          path: ~/.virtualenvs
+          key: poetry-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            poetry-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
+      - name: Install Dependencies
+        run: poetry install
+        if: steps.cache.outputs.cache-hit != 'true'
+      - name: Code quality checks
+        run: |
+          poetry run black igfp tests --check
+          poetry run isort igfp tests --check
+      - name: Static type checking
+        run: poetry run mypy --strict igfp tests
+      - name: Test with pytest
+        run: poetry run pytest tests/
+      - name: Cross validate poetry.lock with requirements.txt
+        run: poetry export --without-hashes | diff requirements.txt -
