@@ -59,7 +59,6 @@ class SettingsModel(BaseSettings):
     """ Refresh every 30 days, to be sure we do not miss the window without spamming. """
 
     class Config:
-        case_sensitive = False
         env_prefix = "IGFP"
 
 
@@ -127,6 +126,9 @@ def startup(
     # redirect_uri: str = Depends(RedirectURI),
     # settings: SettingsModel = Depends(Settings),
 ) -> None:
+    from os import environ
+
+    logger.info(f"ENVVARS: {environ}")
     settings = Settings()
     redirect_uri = RedirectURI(settings=settings)
     scopes = ",".join(settings.scopes)
