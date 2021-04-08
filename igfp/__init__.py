@@ -6,7 +6,7 @@ from typing import Any, List, Optional, cast
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.logger import logger
 from httpx import AsyncClient, HTTPStatusError, Response
-from pydantic import BaseModel, BaseSettings
+from pydantic import BaseModel, BaseSettings, Field
 
 igfp = FastAPI(docs_url=None, openapi_url=None, redoc_url=None)
 igapi = AsyncClient(
@@ -28,33 +28,34 @@ class ProtocolEnum(str, Enum):
 
 class SettingsModel(BaseSettings):
 
-    application_id: str
-    application_secret: str
-    domain: str
-    media_fields: str = (
-        "caption, "
-        "id, "
-        "media_type, "
-        "media_url, "
-        "permalink, "
-        "thumbnail_url, "
-        "timestamp, "
-        "username, "
+    application_id: str = Field(..., env="APPLICATION_ID")
+    application_secret: str = Field(..., env="APPLICATION_SECRET")
+    domain: str = Field(..., env="DOMAIN")
+    media_fields: str = Field(
+        "caption,"
+        "id,"
+        "media_type,"
+        "media_url,"
+        "permalink,"
+        "thumbnail_url,"
+        "timestamp,"
+        "username,"
         "children{"
-        "id, "
-        "media_type, "
-        "media_url, "
-        "permalink, "
-        "thumbnail_url, "
-        "timestamp, "
+        "id,"
+        "media_type,"
+        "media_url,"
+        "permalink,"
+        "thumbnail_url,"
+        "timestamp,"
         "username"
-        "}"
+        "}",
+        env="MEDIA_FIELDS",
     )
-    media_refresh_delay: int = 60 * 5
+    media_refresh_delay: int = Field(60 * 5, env="MEDIA_REFRESH_DELAY")
     """ Refresh media every 5 minutes to avoid API rate limiting. """
-    protocol: ProtocolEnum = ProtocolEnum.HTTPS
-    scopes: List[str] = ["user_media", "user_profile"]
-    token_refresh_delay: int = 60 * 60 * 24 * 30
+    protocol: ProtocolEnum = Field(ProtocolEnum.HTTPS, env="PROTOCOl")
+    scopes: List[str] = Field(["user_media", "user_profile"], env="SCOPES")
+    token_refresh_delay: int = Field(60 * 60 * 24 * 30, env="TOKEN_REFRESH_DELAY")
     """ Refresh every 30 days, to be sure we do not miss the window without spamming. """
 
     class Config:
