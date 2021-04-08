@@ -18,7 +18,7 @@ It aims to be ready to use with minimal effort, just run the
 [Heroku deploy button](https://heroku.com/deploy) above, fill
 parameters, and deploy. An activation link will be displayed
 into the application logs that you will use to authorize your
-application with your target Instagram account and that it.
+application with your target Instagram account and this is it !
 
 ## Features
 
