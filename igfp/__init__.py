@@ -30,10 +30,10 @@ class ProtocolEnum(str, Enum):
 
 class SettingsModel(BaseSettings):
 
-    application_id: str = Field(..., env="APPLICATION_ID")
-    application_secret: str = Field(..., env="APPLICATION_SECRET")
-    domain: str = Field(..., env="DOMAIN")
-    media_fields: str = Field(
+    APPLICATION_ID: str
+    APPLICATION_SECRET: str
+    DOMAIN: str
+    MEDIA_FIELDS: str = (
         "caption,"
         "id,"
         "media_type,"
@@ -50,14 +50,13 @@ class SettingsModel(BaseSettings):
         "thumbnail_url,"
         "timestamp,"
         "username"
-        "}",
-        env="MEDIA_FIELDS",
+        "}"
     )
-    media_refresh_delay: int = Field(60 * 5, env="MEDIA_REFRESH_DELAY")
+    MEDIA_REFRESH_DELAY: int = 60 * 5
     """ Refresh media every 5 minutes to avoid API rate limiting. """
-    protocol: ProtocolEnum = Field(ProtocolEnum.HTTPS, env="PROTOCOl")
-    scopes: List[str] = Field(["user_media", "user_profile"], env="SCOPES")
-    token_refresh_delay: int = Field(60 * 60 * 24 * 30, env="TOKEN_REFRESH_DELAY")
+    PROTOCOL: ProtocolEnum = ProtocolEnum.HTTPS
+    SCOPES: List[str] = ["user_media", "user_profile"]
+    TOKEN_REFRESH_DELAY: int = 60 * 60 * 24 * 30
     """ Refresh every 30 days, to be sure we do not miss the window without spamming. """
 
     class Config:
@@ -91,7 +90,7 @@ def Settings() -> SettingsModel:
 
 @lru_cache(maxsize=1)
 def RedirectURI(settings: SettingsModel = Depends(Settings)) -> str:
-    return f"{settings.protocol}://{settings.domain}/authorize"
+    return f"{settings.PROTOCOL}://{settings.DOMAIN}/authorize"
 
 
 async def AccessToken(
@@ -108,7 +107,7 @@ async def AccessToken(
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
     now = time()
-    if now - context.token_refreshed > settings.token_refresh_delay:
+    if now - context.token_refreshed > settings.TOKEN_REFRESH_DELAY:
         response = await iggraph.get(
             f"refresh_access_token",
             params={
@@ -130,14 +129,14 @@ def startup(
 ) -> None:
     settings = Settings()
     redirect_uri = RedirectURI(settings=settings)
-    scopes = ",".join(settings.scopes)
+    SCOPES = ",".join(settings.SCOPES)
     logger.info(
         f"To activate Instagram feed proxy please authenticate to "
         f"{igapi.base_url}/oauth/authorize"
-        f"?client_id={settings.application_id}"
+        f"?client_id={settings.APPLICATION_ID}"
         f"&redirect_uri={redirect_uri}"
         f"&response_type=code"
-        f"&scope={scopes}"
+        f"&scope={SCOPES}"
     )
 
 
@@ -161,8 +160,8 @@ async def authorize(
     response = await igapi.post(
         "/oauth/access_token",
         json={
-            "app_id": settings.application_id,
-            "app_secret": settings.application_secret,
+            "app_id": settings.APPLICATION_ID,
+            "app_secret": settings.APPLICATION_SECRET,
             "code": code,
             "grant_type": "authorization_code",
             "redirect_uri": redirect_uri,
@@ -174,7 +173,7 @@ async def authorize(
     response = await iggraph.get(
         "/access_token",
         params={
-            "client_secret": settings.application_secret,
+            "client_secret": settings.APPLICATION_SECRET,
             "grant_type": "ig_exchange_token",
             "access_token": initial_token,
         },
@@ -192,10 +191,10 @@ async def media(
 ) -> None:
     """ """
     now = time()
-    if now - context.media_refreshed > settings.media_refresh_delay:
+    if now - context.media_refreshed > settings.MEDIA_REFRESH_DELAY:
         response = await iggraph.get(
             f"/me/media",
-            params={"access_token": access_token, "fields": settings.media_fields},
+            params={"access_token": access_token, "fields": settings.MEDIA_FIELDS},
         )
         raise_for_status(response)
         context.media = response.json()
