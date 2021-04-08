@@ -7,7 +7,7 @@ from typing import Any, List, Optional, cast
 
 from fastapi import Depends, FastAPI, HTTPException, status
 from httpx import AsyncClient, HTTPStatusError, Response
-from pydantic import BaseModel, BaseSettings, Field
+from pydantic import BaseModel, BaseSettings
 
 igfp = FastAPI(docs_url=None, openapi_url=None, redoc_url=None)
 igapi = AsyncClient(
@@ -20,7 +20,18 @@ iggraph = AsyncClient(
     headers={"Accept": "application/json"},
     http2=True,
 )
-logger = logging.getLogger("hypercorn.access")
+
+handler = logging.StreamHandler()
+handler.setFormatter(
+    # NOTE: use the same log format than Hypercorn.
+    logging.Formatter(
+        "%(asctime)s [%(process)d] [%(levelname)s] %(message)s",
+        "[%Y-%m-%d %H:%M:%S %z]",
+    )
+)
+logger = logging.getLogger(__name__)
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 
 class ProtocolEnum(str, Enum):
