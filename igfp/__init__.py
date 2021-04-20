@@ -118,6 +118,9 @@ class Context(BaseModel):
     token: Optional[str] = None
     token_refreshed: float = 0
 
+    class Config:
+        arbitrary_types_allowed = True
+
 
 def raise_for_status(response: Response) -> None:
     try:
