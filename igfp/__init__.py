@@ -1,3 +1,4 @@
+import json
 import logging
 from enum import Enum
 from functools import lru_cache
@@ -13,9 +14,6 @@ from httpx import AsyncClient, HTTPStatusError, Response
 from pydantic import AnyHttpUrl, BaseModel, BaseSettings, validator
 from pydantic.tools import parse_obj_as
 from starlette.responses import RedirectResponse
-
-REDIS_ACCESS_TOKEN_KEY = "igfp-access-token"
-REDIS_REFRESHED_KEY = "igfp-access-token"
 
 api = FastAPI(docs_url=None, openapi_url=None, redoc_url=None)
 
@@ -46,6 +44,13 @@ logger.setLevel(logging.INFO)
 class ProtocolEnum(str, Enum):
     HTTP = "http"
     HTTPS = "https"
+
+
+class RedisKeys(str, Enum):
+    MEDIA = "igfp:media"
+    MEDIA_REFRESHED = "igfp:media-refreshed"
+    TOKEN = "igfp:access-token"
+    TOKEN_REFRESHED = "igfp:access-token-refreshed"
 
 
 class Settings(BaseSettings):
@@ -128,7 +133,26 @@ def get_settings() -> Settings:
 
 @lru_cache(maxsize=1)
 def get_context(settings: Settings = Depends(get_settings)) -> Context:
-    return Context(redis=create_redis(settings.REDIS_URL))
+    redis = create_redis(settings.REDIS_URL)
+    media = redis.get(RedisKeys.MEDIA)
+    media_refreshed = redis.get(RedisKeys.MEDIA_REFRESHED)
+    token = redis.get(RedisKeys.TOKEN)
+    token_refreshed = redis.get(RedisKeys.TOKEN_REFRESHED)
+    if media is not None:
+        media = json.loads(media)
+    if media_refreshed is not None:
+        media_refreshed = float(media_refreshed.decode())
+    if token is not None:
+        token = token.decode()
+    if token_refreshed is not None:
+        token_refreshed = float(token_refreshed.decode())
+    return Context(
+        media=media,
+        media_refreshed=media_refreshed,
+        redis=redis,
+        token=token,
+        token_refreshed=token_refreshed,
+    )
 
 
 def get_redirect_uri(settings: Settings = Depends(get_settings)) -> str:
@@ -161,8 +185,8 @@ async def get_access_token(
         response.raise_for_status()
         context.token = cast(str, response.json().get("access_token"))
         context.token_refreshed = now
-        context.redis.set(REDIS_ACCESS_TOKEN_KEY, context.token)
-        context.redis.set(REDIS_REFRESHED_KEY, str(context.token_refreshed))
+        context.redis.set(RedisKeys.TOKEN, context.token)
+        context.redis.set(RedisKeys.TOKEN_REFRESHED, str(context.token_refreshed))
     return context.token
 
 
@@ -173,12 +197,6 @@ def startup(
     # settings: get_settingsModel = Depends(get_settings),
 ) -> None:
     settings = get_settings()
-    context = get_context(settings=settings)
-    access_token = context.redis.get(REDIS_ACCESS_TOKEN_KEY)
-    access_token_refreshed = context.redis.get(REDIS_REFRESHED_KEY)
-    if access_token is not None and access_token_refreshed is not None:
-        context.token = access_token.decode()
-        context.token_refreshed = float(access_token_refreshed.decode())
     if settings.AUTO_PING_DELAY > 0:
         scheduler = AsyncIOScheduler()
         scheduler.add_job(
@@ -197,14 +215,16 @@ def startup(
         allow_headers=["*"],
     )
     scopes = ",".join(settings.SCOPES)
-    logger.info(
-        f"To activate Instagram feed proxy please authenticate to "
-        f"{igapi.base_url}/oauth/authorize"
-        f"?client_id={settings.APPLICATION_ID}"
-        f"&redirect_uri={get_redirect_uri(settings)}"
-        f"&response_type=code"
-        f"&scope={scopes}"
-    )
+    context = get_context(settings=settings)
+    if context.token is None:
+        logger.info(
+            f"To activate Instagram feed proxy please authenticate to "
+            f"{igapi.base_url}/oauth/authorize"
+            f"?client_id={settings.APPLICATION_ID}"
+            f"&redirect_uri={get_redirect_uri(settings)}"
+            f"&response_type=code"
+            f"&scope={scopes}"
+        )
 
 
 @api.post("/unauthorize")
@@ -248,8 +268,8 @@ async def authorize(
     raise_for_status(response)
     context.token = response.json().get("access_token")
     context.token_refreshed = time()
-    context.redis.set(REDIS_ACCESS_TOKEN_KEY, context.token)
-    context.redis.set(REDIS_REFRESHED_KEY, str(context.token_refreshed))
+    context.redis.set(RedisKeys.TOKEN, context.token)
+    context.redis.set(RedisKeys.TOKEN_REFRESHED, str(context.token_refreshed))
     return RedirectResponse(api.url_path_for("media"))
 
 
@@ -269,4 +289,6 @@ async def media(
         raise_for_status(response)
         context.media = response.json()
         context.media_refreshed = now
+        context.redis.set(RedisKeys.MEDIA, json.dumps(context.media))
+        context.redis.set(RedisKeys.MEDIA_REFRESHED, str(context.media_refreshed))
     return context.media
