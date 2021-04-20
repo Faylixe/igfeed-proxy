@@ -300,6 +300,11 @@ async def media(
         )
         raise_for_status(response)
         context.media = response.json()
+        try:
+            # NOTE: remove paging to avoid exposing access token.
+            context.media["data"].pop("paging")
+        except KeyError:
+            pass
         context.media_refreshed = now
         context.redis.set(RedisKeys.MEDIA, json.dumps(context.media))
         context.redis.set(RedisKeys.MEDIA_REFRESHED, str(context.media_refreshed))

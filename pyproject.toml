@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "igfeed-proxy"
-version = "0.2.4"
+version = "0.2.5"
 description = "A proxy application based on Instagram Basic Display API"
 authors = ["Félix Voituret <felix@voituret.fr>"]
 
