@@ -4,6 +4,8 @@ from functools import lru_cache
 from time import time
 from typing import Any, List, Optional, Union, cast
 
+from redis import Redis, from_url as create_redis
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +13,9 @@ from httpx import AsyncClient, HTTPStatusError, Response
 from pydantic import AnyHttpUrl, BaseModel, BaseSettings, validator
 from pydantic.tools import parse_obj_as
 from starlette.responses import RedirectResponse
+
+REDIS_ACCESS_TOKEN_KEY = "igfp-access-token"
+REDIS_REFRESHED_KEY = "igfp-access-token"
 
 api = FastAPI(docs_url=None, openapi_url=None, redoc_url=None)
 
@@ -43,7 +48,7 @@ class ProtocolEnum(str, Enum):
     HTTPS = "https"
 
 
-class SettingsModel(BaseSettings):
+class Settings(BaseSettings):
 
     APPLICATION_ID: str
     APPLICATION_SECRET: str
@@ -72,6 +77,7 @@ class SettingsModel(BaseSettings):
     MEDIA_REFRESH_DELAY: int = 60 * 5
     """ Refresh media every 5 minutes to avoid API rate limiting. """
     PROTOCOL: ProtocolEnum = ProtocolEnum.HTTPS
+    REDIS_URL: str
     # NOTE: Consider using Enumeration to avoid wrong scope usage.
     SCOPES: Union[str, List[str]] = ["user_media", "user_profile"]
     TOKEN_REFRESH_DELAY: int = 60 * 60 * 24 * 30
@@ -79,6 +85,7 @@ class SettingsModel(BaseSettings):
 
     class Config:
         env_prefix = "IGFP_"
+        fields = {"REDIS_URL": {"env": "REDIS_URL"}}
 
     @validator("CORS_ORIGINS", pre=True)
     def _assemble_cors_origins(
@@ -98,10 +105,11 @@ class SettingsModel(BaseSettings):
         return scopes
 
 
-class ContextModel(BaseModel):
+class Context(BaseModel):
 
     media: Any = None
     media_refreshed: float = 0
+    redis: Redis
     token: Optional[str] = None
     token_refreshed: float = 0
 
@@ -114,22 +122,22 @@ def raise_for_status(response: Response) -> None:
 
 
 @lru_cache(maxsize=1)
-def Context() -> ContextModel:
-    return ContextModel()
+def get_settings() -> Settings:
+    return Settings()
 
 
 @lru_cache(maxsize=1)
-def Settings() -> SettingsModel:
-    return SettingsModel()
+def get_context(settings: Settings = Depends(get_settings)) -> Context:
+    return Context(redis=create_redis(settings.REDIS_URL))
 
 
-def RedirectURI(settings: SettingsModel = Depends(Settings)) -> str:
+def get_redirect_uri(settings: Settings = Depends(get_settings)) -> str:
     return f"{settings.PROTOCOL}://{settings.DOMAIN}/authorize"
 
 
-async def AccessToken(
-    context: ContextModel = Depends(Context),
-    settings: SettingsModel = Depends(Settings),
+async def get_access_token(
+    context: Context = Depends(get_context),
+    settings: Settings = Depends(get_settings),
 ) -> str:
     """
     Retrieve and return API access token, refreshing it if necessary.
@@ -151,18 +159,26 @@ async def AccessToken(
             },
         )
         response.raise_for_status()
-        context.token = response.json().get("access_token")
+        context.token = cast(str, response.json().get("access_token"))
         context.token_refreshed = now
-    return cast(str, context.token)
+        context.redis.set(REDIS_ACCESS_TOKEN_KEY, context.token)
+        context.redis.set(REDIS_REFRESHED_KEY, str(context.token_refreshed))
+    return context.token
 
 
 @api.on_event("startup")
 def startup(
     # NOTE: FastAPI doesn't support event callback dependency injection yet :'(
-    # redirect_uri: str = Depends(RedirectURI),
-    # settings: SettingsModel = Depends(Settings),
+    # redirect_uri: str = Depends(get_redirect_uri),
+    # settings: get_settingsModel = Depends(get_settings),
 ) -> None:
-    settings = Settings()
+    settings = get_settings()
+    context = get_context(settings=settings)
+    access_token = context.redis.get(REDIS_ACCESS_TOKEN_KEY)
+    access_token_refreshed = context.redis.get(REDIS_REFRESHED_KEY)
+    if access_token is not None and access_token_refreshed is not None:
+        context.token = access_token.decode()
+        context.token_refreshed = float(access_token_refreshed.decode())
     if settings.AUTO_PING_DELAY > 0:
         scheduler = AsyncIOScheduler()
         scheduler.add_job(
@@ -185,7 +201,7 @@ def startup(
         f"To activate Instagram feed proxy please authenticate to "
         f"{igapi.base_url}/oauth/authorize"
         f"?client_id={settings.APPLICATION_ID}"
-        f"&redirect_uri={RedirectURI(settings)}"
+        f"&redirect_uri={get_redirect_uri(settings)}"
         f"&response_type=code"
         f"&scope={scopes}"
     )
@@ -200,9 +216,9 @@ async def sink() -> RedirectResponse:
 @api.get("/authorize")
 async def authorize(
     code: str,
-    context: ContextModel = Depends(Context),
-    redirect_uri: str = Depends(RedirectURI),
-    settings: SettingsModel = Depends(Settings),
+    context: Context = Depends(get_context),
+    redirect_uri: str = Depends(get_redirect_uri),
+    settings: Settings = Depends(get_settings),
 ) -> RedirectResponse:
     if context.token is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
@@ -232,14 +248,16 @@ async def authorize(
     raise_for_status(response)
     context.token = response.json().get("access_token")
     context.token_refreshed = time()
+    context.redis.set(REDIS_ACCESS_TOKEN_KEY, context.token)
+    context.redis.set(REDIS_REFRESHED_KEY, str(context.token_refreshed))
     return RedirectResponse(api.url_path_for("media"))
 
 
 @api.get("/")
 async def media(
-    access_token: str = Depends(AccessToken),
-    context: ContextModel = Depends(Context),
-    settings: SettingsModel = Depends(Settings),
+    access_token: str = Depends(get_access_token),
+    context: Context = Depends(get_context),
+    settings: Settings = Depends(get_settings),
 ) -> Any:
     now = time()
     if now - context.media_refreshed > settings.MEDIA_REFRESH_DELAY:
