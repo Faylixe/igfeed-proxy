@@ -302,7 +302,7 @@ async def media(
         context.media = response.json()
         try:
             # NOTE: remove paging to avoid exposing access token.
-            context.media["data"].pop("paging")
+            del context.media["data"]["paging"]
         except KeyError:
             pass
         context.media_refreshed = now
