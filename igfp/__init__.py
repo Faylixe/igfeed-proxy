@@ -152,10 +152,10 @@ def get_context() -> Context:
         token_refreshed = float(token_refreshed.decode())
     return Context(
         media=media,
-        media_refreshed=media_refreshed,
+        media_refreshed=media_refreshed or 0,
         redis=redis,
         token=token,
-        token_refreshed=token_refreshed,
+        token_refreshed=token_refreshed or 0,
     )
 
 
