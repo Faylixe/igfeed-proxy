@@ -197,7 +197,7 @@ async def get_access_token(
 
 
 @api.on_event("startup")
-def startup(
+async def startup(
     # NOTE: FastAPI doesn't support event callback dependency injection yet :'(
     # redirect_uri: str = Depends(get_redirect_uri),
     # settings: get_settingsModel = Depends(get_settings),
@@ -231,6 +231,12 @@ def startup(
             f"&response_type=code"
             f"&scope={scopes}"
         )
+
+
+@api.on_event("shutdown")
+async def shutdown() -> None:
+    await igapi.aclose()
+    await iggraph.aclose()
 
 
 @api.post("/unauthorize")
