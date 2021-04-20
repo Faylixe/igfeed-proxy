@@ -135,7 +135,8 @@ def get_settings() -> Settings:
 
 
 @lru_cache(maxsize=1)
-def get_context(settings: Settings = Depends(get_settings)) -> Context:
+def get_context() -> Context:
+    settings = get_settings()
     redis = create_redis(settings.REDIS_URL)
     media = redis.get(RedisKeys.MEDIA)
     media_refreshed = redis.get(RedisKeys.MEDIA_REFRESHED)
@@ -158,7 +159,9 @@ def get_context(settings: Settings = Depends(get_settings)) -> Context:
     )
 
 
-def get_redirect_uri(settings: Settings = Depends(get_settings)) -> str:
+@lru_cache(maxsize=1)
+def get_redirect_uri() -> str:
+    settings = get_settings()
     return f"{settings.PROTOCOL}://{settings.DOMAIN}/authorize"
 
 
