@@ -227,7 +227,7 @@ def startup(
             f"To activate Instagram feed proxy please authenticate to "
             f"{igapi.base_url}/oauth/authorize"
             f"?client_id={settings.APPLICATION_ID}"
-            f"&redirect_uri={get_redirect_uri(settings)}"
+            f"&redirect_uri={get_redirect_uri()}"
             f"&response_type=code"
             f"&scope={scopes}"
         )
