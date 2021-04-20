@@ -221,7 +221,7 @@ def startup(
         allow_headers=["*"],
     )
     scopes = ",".join(settings.SCOPES)
-    context = get_context(settings=settings)
+    context = get_context()
     if context.token is None:
         logger.info(
             f"To activate Instagram feed proxy please authenticate to "
